@@ -1,0 +1,108 @@
+name: skill-voice-pipeline
+version: 0.1.0
+mode: service
+entrypoint: src.skill_voice_pipeline_service.app:app
+core_api: ">=1.0,<2.0"
+capabilities:
+  - id: voice_pipeline.runtime_snapshot
+    description: Return the current voice pipeline runtime snapshot.
+    input_schema:
+      type: object
+      additionalProperties: false
+    output_schema:
+      type: object
+      required: [status]
+      properties:
+        status: {type: string}
+        available: {type: boolean}
+        updated_at: {type: string}
+        active_provider: {type: ["string", "null"]}
+        supported_providers:
+          type: array
+          items: {type: string}
+        last_transcription_at: {type: ["string", "null"]}
+        counters: {type: object}
+    risk_level: low
+    confirmation_required: false
+    retry_policy: bounded_backoff
+    observability_events:
+      - voice_pipeline.runtime_snapshot
+  - id: voice_pipeline.health_snapshot
+    description: Return the current voice pipeline health snapshot.
+    input_schema:
+      type: object
+      additionalProperties: false
+    output_schema:
+      type: object
+      required: [status, available]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, error]
+        available:
+          type: boolean
+        provider_status:
+          type: object
+          description: "Map of provider name → availability"
+        updated_at:
+          type: string
+        detail: {type: ["string", "null"]}
+    risk_level: low
+    confirmation_required: false
+    retry_policy: bounded_backoff
+    observability_events:
+      - voice_pipeline.health_snapshot
+  - id: voice_pipeline.speech_to_text
+    description: Transcribe an audio file through the voice pipeline.
+    input_schema:
+      type: object
+      required:
+        - provider
+        - session_id
+        - chat_id
+        - voice_file_id
+        - audio_path
+    output_schema:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, error, timeout, provider_error]
+        transcription:
+          type: ["string", "null"]
+          description: "Transcribed text from voice note"
+        language:
+          type: ["string", "null"]
+          description: "Detected language code (e.g. 'vi', 'en')"
+        duration_seconds:
+          type: ["number", "null"]
+        provider_used:
+          type: ["string", "null"]
+        model_used:
+          type: ["string", "null"]
+        confidence:
+          type: ["number", "null"]
+          description: "Transcription confidence 0.0-1.0"
+        detail:
+          type: ["string", "null"]
+    risk_level: medium
+    confirmation_required: false
+    retry_policy: bounded_backoff
+    observability_events:
+      - voice_pipeline.transcription
+permissions:
+  read_memory: false
+  write_memory: false
+  internet_access: true
+  file_write: true
+  external_actions: false
+healthcheck:
+  kind: http
+  url: http://127.0.0.1:8420/health
+service:
+  base_url: http://127.0.0.1:8420
+  execute_path: /execute
+  health_path: /health
+timeout_ms: 120000
+enabled_by_default: true
